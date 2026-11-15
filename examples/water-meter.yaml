@@ -1,0 +1,32 @@
+# Minimal device configuration using the ready-made package.
+# Put the secrets in secrets.yaml next to this file.
+
+substitutions:
+  name: water-meter
+  meter_id: "12345678"                # serial number printed on the meter
+  meter_key: !secret water_meter_key  # AES key from your water utility
+
+packages:
+  multical21: github://mryndak/esphome-multical21/packages/multical21.yaml@v1.0.0
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password

@@ -1,0 +1,171 @@
+# ESPHome Kamstrup MULTICAL 21
+
+ESPHome component for reading a **Kamstrup MULTICAL 21** water meter over wireless M-Bus
+(mode C1, 868.95 MHz) with an **ESP32** and a **CC1101** radio module.
+
+The meter broadcasts an encrypted telegram every ~16 seconds. The component receives it,
+checks every CRC, decrypts it with your meter key and publishes the readings to Home Assistant.
+
+- Small and self-contained: one meter type, no external wM-Bus libraries
+- ESP32 with the ESP-IDF framework (tested on ESPHome 2026.10)
+- Decodes both full and compact frames, all CRCs verified
+- Ready-made package: a working device config is about 25 lines
+
+## Entities
+
+| Key | Type | Description |
+|---|---|---|
+| `total_volume` | sensor, m³ | Meter reading, `total_increasing` (works with the HA Energy dashboard) |
+| `target_volume` | sensor, m³ | Reading at the last target date (end of month) |
+| `flow_temperature` | sensor, °C | Water temperature |
+| `ambient_temperature` | sensor, °C | Temperature around the meter |
+| `rssi` | sensor, dBm | Signal strength of the last telegram |
+| `status` | text sensor | `OK` or the active alarms, e.g. `LEAK` |
+| `alarm_history` | text sensor | Alarms in the last month, e.g. `leak 1-8 hours`, or `none` |
+| `leak` | binary sensor | Leak alarm |
+| `burst` | binary sensor | Burst alarm |
+| `dry` | binary sensor | No water in the meter |
+| `reverse` | binary sensor | Reverse flow |
+
+## Hardware
+
+Any ESP32 board and a **868 MHz** CC1101 module. 433 MHz modules look the same but
+barely hear anything at 868 MHz; check the marking on the board and use an 868 MHz antenna.
+
+| CC1101 | ESP32 (package defaults) |
+|---|---|
+| VCC | 3V3 |
+| GND | GND |
+| SCK | GPIO14 |
+| MOSI (SI) | GPIO23 |
+| MISO (SO) | GPIO19 |
+| CSN | GPIO18 |
+| GDO0, GDO2 | not needed |
+
+## Quick start (package)
+
+1. Ask your water utility for the meter's **AES key** (32 hex characters).
+2. Note the **serial number** printed on the meter, e.g. `12345678`.
+3. Create the device in ESPHome:
+
+```yaml
+substitutions:
+  name: water-meter
+  meter_id: "12345678"
+  meter_key: !secret water_meter_key
+
+packages:
+  multical21: github://mryndak/esphome-multical21/packages/multical21.yaml@v1.0.0
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+```
+
+Other wiring, a pinned version or different entity names are set with substitutions, for example:
+
+```yaml
+substitutions:
+  multical21_cs_pin: GPIO5
+  multical21_total_volume_name: "Cold water"
+```
+
+See [`packages/multical21.yaml`](packages/multical21.yaml) for all of them.
+
+## Manual configuration
+
+Use the component directly if you want full control over the entities:
+
+```yaml
+external_components:
+  - source: github://mryndak/esphome-multical21@v1.0.0
+    components: [multical21]
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+multical21:
+  meter_id: "12345678"         # serial number printed on the meter
+  key: !secret water_meter_key # 32 hex characters
+  cs_pin: GPIO18
+  # frequency: 868.95MHz       # optional
+
+sensor:
+  - platform: multical21
+    total_volume:
+      name: "Water total"
+    flow_temperature:
+      name: "Water temperature"
+
+binary_sensor:
+  - platform: multical21
+    leak:
+      name: "Water leak"
+```
+
+All entities are optional; add only the ones you need.
+
+## Troubleshooting
+
+Set `logger: level: DEBUG`. Every telegram is logged:
+
+```
+[D][multical21]: Telegram (compact): 123.456 m3, target 120.000 m3, 12/21 C, OK, RSSI -80 dBm
+```
+
+Every 10 minutes the component logs radio statistics:
+
+```
+[D][multical21]: Radio: ... 167 syncs, 6 frames (...); 0 CRC errors, 0 other meters, 6 telegrams
+```
+
+| Symptom | Likely cause |
+|---|---|
+| `CC1101 not responding` | Wiring, `cs_pin`, or the module has no power |
+| No `frames`, only `syncs` | Too far from the meter, wrong module (433 MHz), no antenna |
+| `could not be decrypted - check the key` | Wrong `key` |
+| `Frame from another meter` | Normal: neighbours' meters; check `meter_id` if yours never shows up |
+
+## How it works
+
+- **Radio** (`multical21.cpp`): the CC1101 is configured for wM-Bus mode C (2-FSK, ~100 kbit/s,
+  sync word `0x543D`). A FreeRTOS task polls the FIFO, recognises frame format A or B
+  from the second sync word and reads exactly one frame.
+- **Protocol** (`protocol.cpp`, no ESPHome dependencies): block CRCs, the extended link layer
+  (CI `0x8D`), AES-128-CTR decryption, payload CRC, full (`0x78`) and compact (`0x79`)
+  MULTICAL 21 frames. Compact frames are checked by rebuilding the full frame and comparing its CRC.
+
+## Development
+
+Unit tests for the protocol layer run on any PC with a C++17 compiler:
+
+```sh
+make -C tests
+```
+
+The test telegrams in `tests/test_vectors.h` are synthetic (made-up meter id and key) and are
+generated by `tests/make_test_vectors.py`. CI also compiles `tests/ci.yaml` with ESPHome.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

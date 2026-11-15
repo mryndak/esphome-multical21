@@ -1,0 +1,88 @@
+# Kamstrup MULTICAL 21 water meter - ready-made ESPHome package.
+#
+# Required substitutions in your device config:
+#   meter_id:  serial number printed on the meter, e.g. "12345678"
+#   meter_key: 32 hex character AES key from your water utility
+#
+# Everything else has a default below and can be overridden the same way:
+# CC1101 wiring, component version and the entity names.
+
+substitutions:
+  multical21_version: v1.0.0
+  multical21_clk_pin: GPIO14
+  multical21_mosi_pin: GPIO23
+  multical21_miso_pin: GPIO19
+  multical21_cs_pin: GPIO18
+  multical21_total_volume_name: "Water total"
+  multical21_target_volume_name: "Water at end of month"
+  multical21_flow_temperature_name: "Water temperature"
+  multical21_ambient_temperature_name: "Meter ambient temperature"
+  multical21_rssi_name: "Meter signal"
+  multical21_status_name: "Meter status"
+  multical21_alarm_history_name: "Meter alarm history"
+  multical21_leak_name: "Water leak"
+  multical21_burst_name: "Pipe burst"
+  multical21_dry_name: "No water"
+  multical21_reverse_name: "Reverse flow"
+
+external_components:
+  - source: github://mryndak/esphome-multical21@${multical21_version}
+    components: [multical21]
+
+spi:
+  id: multical21_spi
+  clk_pin: ${multical21_clk_pin}
+  mosi_pin: ${multical21_mosi_pin}
+  miso_pin: ${multical21_miso_pin}
+
+multical21:
+  id: multical21_meter
+  spi_id: multical21_spi
+  cs_pin: ${multical21_cs_pin}
+  meter_id: ${meter_id}
+  key: ${meter_key}
+
+sensor:
+  - platform: multical21
+    multical21_id: multical21_meter
+    total_volume:
+      id: multical21_total_volume
+      name: ${multical21_total_volume_name}
+    target_volume:
+      id: multical21_target_volume
+      name: ${multical21_target_volume_name}
+    flow_temperature:
+      id: multical21_flow_temperature
+      name: ${multical21_flow_temperature_name}
+    ambient_temperature:
+      id: multical21_ambient_temperature
+      name: ${multical21_ambient_temperature_name}
+    rssi:
+      id: multical21_rssi
+      name: ${multical21_rssi_name}
+
+text_sensor:
+  - platform: multical21
+    multical21_id: multical21_meter
+    status:
+      id: multical21_status
+      name: ${multical21_status_name}
+    alarm_history:
+      id: multical21_alarm_history
+      name: ${multical21_alarm_history_name}
+
+binary_sensor:
+  - platform: multical21
+    multical21_id: multical21_meter
+    leak:
+      id: multical21_leak
+      name: ${multical21_leak_name}
+    burst:
+      id: multical21_burst
+      name: ${multical21_burst_name}
+    dry:
+      id: multical21_dry
+      name: ${multical21_dry_name}
+    reverse:
+      id: multical21_reverse
+      name: ${multical21_reverse_name}

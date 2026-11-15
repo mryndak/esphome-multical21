@@ -1,0 +1,58 @@
+# Compile test for CI: every option of the component, local sources.
+esphome:
+  name: multical21-ci
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: VERBOSE
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+multical21:
+  meter_id: "12345678"
+  key: "000102030405060708090A0B0C0D0E0F"
+  cs_pin: GPIO18
+  frequency: 868.95MHz
+
+sensor:
+  - platform: multical21
+    total_volume:
+      name: "Water total"
+    target_volume:
+      name: "Water target"
+    flow_temperature:
+      name: "Water temperature"
+    ambient_temperature:
+      name: "Ambient temperature"
+    rssi:
+      name: "RSSI"
+
+text_sensor:
+  - platform: multical21
+    status:
+      name: "Status"
+    alarm_history:
+      name: "Alarm history"
+
+binary_sensor:
+  - platform: multical21
+    leak:
+      name: "Leak"
+    burst:
+      name: "Burst"
+    dry:
+      name: "Dry"
+    reverse:
+      name: "Reverse flow"

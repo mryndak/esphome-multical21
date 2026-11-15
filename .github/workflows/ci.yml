@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Protocol unit tests
+        run: make -C tests
+      - name: Test vectors are up to date
+        run: |
+          pip install cryptography
+          python tests/make_test_vectors.py | diff - tests/test_vectors.h
+
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install ESPHome
+        run: pip install esphome==2026.10.2
+      - name: Compile test configuration
+        run: esphome compile tests/ci.yaml
